@@ -101,6 +101,14 @@ jobs:
           cmake -B build -DCMAKE_BUILD_TYPE=Release -Dpybind11_DIR=$(python -c "import pybind11; print(pybind11.get_cmake_dir())")
           cmake --build build -j$(nproc || sysctl -n hw.ncpu)
 
+      # Create placeholder for backend binary (PyInstaller bundle is done locally, not in CI)
+      - name: Create backend placeholder
+        working-directory: desktop/src-tauri
+        run: |
+          mkdir -p bin
+          echo "placeholder" > bin/semiovis_api
+          chmod +x bin/semiovis_api
+
       # Install Tauri CLI
       - name: Install Tauri CLI
         run: cargo install tauri-cli --version "^2"
