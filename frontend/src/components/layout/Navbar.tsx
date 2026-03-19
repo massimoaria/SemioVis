@@ -32,7 +32,7 @@ export function Navbar() {
       </header>
 
       <SettingsModal open={showSettings} onClose={() => setShowSettings(false)} />
-      <HelpModal open={showHelp} onClose={() => setShowHelp(false)} />
+      <HelpModal open={showHelp} onClose={() => setShowHelp(false)} onOpenSettings={() => setShowSettings(true)} />
     </>
   )
 }

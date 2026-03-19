@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { AlertTriangle, X } from 'lucide-react'
 import { Layout } from './components/layout/Layout'
 import { HomePage } from './components/layout/HomePage'
 import { MethodologyGuide } from './components/layout/MethodologyGuide'
@@ -10,6 +11,42 @@ import { CompositionalPanel } from './components/compositional/CompositionalPane
 import { DashboardPanel } from './components/dashboard/DashboardPanel'
 import { ReportPanel } from './components/report/ReportPanel'
 import { useAnalysisStore } from './store/analysisStore'
+
+function ApiKeyBanner() {
+  const settings = useAnalysisStore((s) => s.settings)
+  const [dismissed, setDismissed] = useState(false)
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem('semiovis_api_banner_dismissed')
+    if (stored === 'true') setDismissed(true)
+  }, [])
+
+  const hasKey = settings.apiKeys.gemini || settings.apiKeys.openai || settings.apiKeys.mistral
+  if (hasKey || dismissed) return null
+
+  const dismiss = () => {
+    setDismissed(true)
+    sessionStorage.setItem('semiovis_api_banner_dismissed', 'true')
+  }
+
+  return (
+    <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-center gap-3">
+      <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+      <p className="text-sm text-amber-800 flex-1">
+        <span className="font-medium">No LLM API key configured.</span>{' '}
+        Analysis reports will use basic rule-based interpretations. For richer, contextual
+        semiotic analysis, add a free{' '}
+        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="underline font-medium">
+          Google Gemini API key
+        </a>{' '}
+        in Settings.
+      </p>
+      <button onClick={dismiss} className="p-1 hover:bg-amber-100 rounded flex-shrink-0" title="Dismiss">
+        <X className="w-4 h-4 text-amber-600" />
+      </button>
+    </div>
+  )
+}
 
 function App() {
   const activeTab = useAnalysisStore((s) => s.activeTab)
@@ -26,6 +63,7 @@ function App() {
   if (showMethodology) {
     return (
       <Layout>
+        <ApiKeyBanner />
         <MethodologyGuide onBack={() => setShowMethodology(false)} />
       </Layout>
     )
@@ -33,6 +71,7 @@ function App() {
 
   return (
     <Layout>
+      <ApiKeyBanner />
       <div className="flex h-full">
         {/* Sidebar: image preview */}
         <aside className="w-64 border-r border-gray-200 bg-white p-4 flex flex-col gap-4 overflow-y-auto">

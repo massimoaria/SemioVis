@@ -57,6 +57,12 @@ export function SettingsModal({ open, onClose }: Props) {
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   Google Gemini (free tier: 15 RPM)
+                  <a
+                    href="https://aistudio.google.com/apikey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-1 text-primary-600 hover:underline"
+                  >Get free key</a>
                 </label>
                 <input
                   type="password"
@@ -69,6 +75,12 @@ export function SettingsModal({ open, onClose }: Props) {
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   OpenAI GPT-4o (paid)
+                  <a
+                    href="https://platform.openai.com/api-keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-1 text-primary-600 hover:underline"
+                  >Get key</a>
                 </label>
                 <input
                   type="password"
@@ -81,6 +93,12 @@ export function SettingsModal({ open, onClose }: Props) {
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   Mistral / Pixtral (free tier available)
+                  <a
+                    href="https://console.mistral.ai/api-keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-1 text-primary-600 hover:underline"
+                  >Get key</a>
                 </label>
                 <input
                   type="password"

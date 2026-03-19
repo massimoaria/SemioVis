@@ -1,7 +1,7 @@
 {
   "productName": "SemioVis",
   "version": "1.0.0",
-  "identifier": "com.semiovis.app",
+  "identifier": "com.semiovis.desktop",
   "build": {
     "frontendDist": "../../frontend/dist"
   },
