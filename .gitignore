@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.so
+*.dylib
+*.dll
+.venv/
+venv/
+env/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Tauri
+desktop/src-tauri/target/
+
+# C++ build
+backend/cpp/build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+.env.production
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ML models (downloaded at runtime)
+backend/models/*.pt
+backend/models/*.onnx
+!backend/models/.gitkeep
+!backend/models/download_models.py
+!backend/models/README.md
+
+# Uploads
+/tmp/semiovis_uploads/
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Docker
+docker-compose.override.yml
+
+# Books / large files
+*.pdf
