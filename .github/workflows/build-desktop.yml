@@ -159,11 +159,7 @@ jobs:
           # Create a wrapper script so sidecar.rs can find it at bin/semiovis_api (as file)
           if [ -d "desktop/src-tauri/bin/semiovis_api" ]; then
             mv desktop/src-tauri/bin/semiovis_api desktop/src-tauri/bin/semiovis_api_dir
-            cat > desktop/src-tauri/bin/semiovis_api <<'WRAPPER'
-#!/bin/bash
-DIR="$(cd "$(dirname "$0")/semiovis_api_dir" && pwd)"
-exec "$DIR/semiovis_api" "$@"
-WRAPPER
+            printf '#!/bin/bash\nDIR="$(cd "$(dirname "$0")/semiovis_api_dir" && pwd)"\nexec "$DIR/semiovis_api" "$@"\n' > desktop/src-tauri/bin/semiovis_api
             chmod +x desktop/src-tauri/bin/semiovis_api
           fi
 
