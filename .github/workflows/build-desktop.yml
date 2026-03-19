@@ -19,9 +19,6 @@ jobs:
           - platform: macos-latest
             target: aarch64-apple-darwin
             label: macOS-arm64
-          - platform: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            label: Linux-x64
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
             label: Windows-x64
@@ -38,15 +35,6 @@ jobs:
         run: rm -f desktop/build-scripts/semiovis_api.spec
 
       # ── System dependencies ──────────────────────────────────────
-
-      - name: Install Linux dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev librsvg2-dev \
-            libssl-dev libgtk-3-dev libayatana-appindicator3-dev \
-            cmake libopencv-dev libeigen3-dev patchelf
 
       - name: Install macOS dependencies
         if: runner.os == 'macOS'
@@ -93,15 +81,15 @@ jobs:
       - name: Download model weights
         run: python backend/models/download_models.py
 
-      # ── Build C++ core (non-Windows) ────────────────────────────
+      # ── Build C++ core (macOS only) ─────────────────────────────
 
       - name: Build C++ core
-        if: runner.os != 'Windows'
+        if: runner.os == 'macOS'
         working-directory: backend/cpp
         run: |
           cmake -B build -DCMAKE_BUILD_TYPE=Release \
             -Dpybind11_DIR=$(python -c "import pybind11; print(pybind11.get_cmake_dir())")
-          cmake --build build -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+          cmake --build build -j$(sysctl -n hw.ncpu)
 
       # ── Build frontend ──────────────────────────────────────────
 
@@ -119,85 +107,43 @@ jobs:
         if: runner.os == 'macOS'
         run: python desktop/build-scripts/bundle_backend.py
 
-      - name: Bundle backend (Linux — onedir)
-        if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          mkdir -p desktop/src-tauri/bin
-          # Find C++ shared library
-          SO_FILE=$(find backend/cpp/build -name 'semiovis_core*.so' 2>/dev/null | head -1)
-          EXTRA_ARGS=""
-          if [ -n "$SO_FILE" ]; then
-            EXTRA_ARGS="--add-binary $SO_FILE:."
-          fi
-          # Add model files
-          for f in backend/models/*.pt backend/models/*.onnx; do
-            [ -f "$f" ] && EXTRA_ARGS="$EXTRA_ARGS --add-data $f:models/"
-          done
-          python -m PyInstaller backend/main.py \
-            --name semiovis_api \
-            --onedir \
-            --clean \
-            --noconfirm \
-            --hidden-import semiovis_core \
-            --hidden-import uvicorn \
-            --hidden-import uvicorn.logging \
-            --hidden-import uvicorn.loops \
-            --hidden-import uvicorn.loops.auto \
-            --hidden-import uvicorn.protocols \
-            --hidden-import uvicorn.protocols.http \
-            --hidden-import uvicorn.protocols.http.auto \
-            --hidden-import uvicorn.protocols.websockets \
-            --hidden-import uvicorn.protocols.websockets.auto \
-            --hidden-import uvicorn.lifespan \
-            --hidden-import uvicorn.lifespan.on \
-            $EXTRA_ARGS \
-            --distpath desktop/src-tauri \
-            --workpath /tmp/pyinstaller-build \
-            --specpath /tmp/pyinstaller-build
-          # --onedir creates desktop/src-tauri/semiovis_api/ directory with executable inside
-          # Move it to bin/ for Tauri resources
-          if [ -d "desktop/src-tauri/semiovis_api" ]; then
-            rm -rf desktop/src-tauri/bin
-            mv desktop/src-tauri/semiovis_api desktop/src-tauri/bin
-            echo "Linux backend dir size: $(du -sh desktop/src-tauri/bin | cut -f1)"
-          fi
-
       - name: Bundle backend (Windows — onedir)
         if: runner.os == 'Windows'
-        shell: bash
+        shell: pwsh
         run: |
-          mkdir -p desktop/src-tauri/bin
-          EXTRA_ARGS=""
-          for f in backend/models/*.pt backend/models/*.onnx; do
-            [ -f "$f" ] && EXTRA_ARGS="$EXTRA_ARGS --add-data $f;models/"
-          done
-          python -m PyInstaller backend/main.py \
-            --name semiovis_api \
-            --onedir \
-            --clean \
-            --noconfirm \
-            --hidden-import uvicorn \
-            --hidden-import uvicorn.logging \
-            --hidden-import uvicorn.loops \
-            --hidden-import uvicorn.loops.auto \
-            --hidden-import uvicorn.protocols \
-            --hidden-import uvicorn.protocols.http \
-            --hidden-import uvicorn.protocols.http.auto \
-            --hidden-import uvicorn.protocols.websockets \
-            --hidden-import uvicorn.protocols.websockets.auto \
-            --hidden-import uvicorn.lifespan \
-            --hidden-import uvicorn.lifespan.on \
-            $EXTRA_ARGS \
-            --distpath desktop/src-tauri \
-            --workpath C:/tmp/pyinstaller-build \
-            --specpath C:/tmp/pyinstaller-build
+          $models = Get-ChildItem -Path backend/models -Include *.pt,*.onnx -Recurse
+          $addData = @()
+          foreach ($m in $models) {
+            $addData += "--add-data"
+            $addData += "$($m.FullName);models/"
+          }
+          python -m PyInstaller backend/main.py `
+            --name semiovis_api `
+            --onedir `
+            --clean `
+            --noconfirm `
+            --hidden-import uvicorn `
+            --hidden-import uvicorn.logging `
+            --hidden-import uvicorn.loops `
+            --hidden-import uvicorn.loops.auto `
+            --hidden-import uvicorn.protocols `
+            --hidden-import uvicorn.protocols.http `
+            --hidden-import uvicorn.protocols.http.auto `
+            --hidden-import uvicorn.protocols.websockets `
+            --hidden-import uvicorn.protocols.websockets.auto `
+            --hidden-import uvicorn.lifespan `
+            --hidden-import uvicorn.lifespan.on `
+            @addData `
+            --distpath desktop/src-tauri `
+            --workpath desktop/build-scripts/build `
+            --specpath desktop/build-scripts
           # Move onedir output to bin/
-          if [ -d "desktop/src-tauri/semiovis_api" ]; then
-            rm -rf desktop/src-tauri/bin
-            mv desktop/src-tauri/semiovis_api desktop/src-tauri/bin
-            echo "Windows backend dir size: $(du -sh desktop/src-tauri/bin | cut -f1)"
-          fi
+          if (Test-Path "desktop/src-tauri/semiovis_api") {
+            if (Test-Path "desktop/src-tauri/bin") { Remove-Item -Recurse -Force "desktop/src-tauri/bin" }
+            Rename-Item "desktop/src-tauri/semiovis_api" "bin"
+            $size = (Get-ChildItem -Recurse "desktop/src-tauri/bin" | Measure-Object -Property Length -Sum).Sum / 1MB
+            Write-Host "Windows backend dir size: $([math]::Round($size, 1)) MB"
+          }
 
       - name: Verify backend binary
         shell: bash
@@ -243,15 +189,6 @@ jobs:
           name: SemioVis-${{ matrix.label }}
           path: desktop/src-tauri/target/release/bundle/dmg/*.dmg
 
-      - name: Upload Linux bundle
-        if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
-        with:
-          name: SemioVis-${{ matrix.label }}
-          path: |
-            desktop/src-tauri/target/release/bundle/deb/*.deb
-            desktop/src-tauri/target/release/bundle/appimage/*.AppImage
-
       - name: Upload Windows bundle
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
@@ -274,15 +211,13 @@ jobs:
 
       - name: List downloaded artifacts
         shell: bash
-        run: find . -type f \( -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.msi" -o -name "*.exe" \)
+        run: find . -type f \( -name "*.dmg" -o -name "*.msi" -o -name "*.exe" \)
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             SemioVis-*/*.dmg
-            SemioVis-*/*.deb
-            SemioVis-*/*.AppImage
             SemioVis-*/*.msi
             SemioVis-*/*.exe
           generate_release_notes: true
