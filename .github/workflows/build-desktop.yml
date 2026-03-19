@@ -101,34 +101,44 @@ jobs:
           cmake -B build -DCMAKE_BUILD_TYPE=Release
           cmake --build build -j$(nproc || sysctl -n hw.ncpu)
 
-      # Build Tauri
-      - name: Build Tauri app
+      # Install Tauri CLI
+      - name: Install Tauri CLI
+        run: cargo install tauri-cli --version "^2"
+
+      # Build Tauri bundle (.app/.dmg/.msi/.deb/.AppImage)
+      - name: Build Tauri app bundle
         working-directory: desktop/src-tauri
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo tauri build
 
-      # Package artifacts
-      - name: Package binary (Unix)
-        if: runner.os != 'Windows'
-        run: |
-          mkdir -p dist
-          cp desktop/src-tauri/target/${{ matrix.target }}/release/semiovis-desktop dist/
-          cd dist && tar czf ../SemioVis-${{ matrix.label }}.tar.gz *
-
-      - name: Package binary (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          mkdir dist
-          copy desktop\src-tauri\target\${{ matrix.target }}\release\semiovis-desktop.exe dist\
-          Compress-Archive -Path dist\* -DestinationPath SemioVis-${{ matrix.label }}.zip
-
-      # Upload artifacts
-      - name: Upload artifact
+      # Upload macOS artifacts
+      - name: Upload macOS bundle
+        if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
           name: SemioVis-${{ matrix.label }}
           path: |
-            SemioVis-*.tar.gz
-            SemioVis-*.zip
+            desktop/src-tauri/target/release/bundle/dmg/*.dmg
+            desktop/src-tauri/target/release/bundle/macos/*.app
+
+      # Upload Linux artifacts
+      - name: Upload Linux bundle
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SemioVis-${{ matrix.label }}
+          path: |
+            desktop/src-tauri/target/release/bundle/deb/*.deb
+            desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+
+      # Upload Windows artifacts
+      - name: Upload Windows bundle
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: SemioVis-${{ matrix.label }}
+          path: |
+            desktop/src-tauri/target/release/bundle/msi/*.msi
+            desktop/src-tauri/target/release/bundle/nsis/*.exe
 
   # Create release when tagged
   release:
@@ -145,6 +155,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            SemioVis-*/*.tar.gz
-            SemioVis-*/*.zip
+            SemioVis-*/*.dmg
+            SemioVis-*/*.deb
+            SemioVis-*/*.AppImage
+            SemioVis-*/*.msi
+            SemioVis-*/*.exe
           generate_release_notes: true
