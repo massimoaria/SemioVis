@@ -112,19 +112,74 @@ jobs:
         run: npm run build
 
       # ── Bundle backend with PyInstaller ─────────────────────────
+      # macOS: --onefile works fine (~400MB)
+      # Linux: --onefile exceeds 4GB struct limit → use --onedir
+      # Windows: --onefile, no C++ core yet
 
-      - name: Bundle backend (macOS/Linux)
-        if: runner.os != 'Windows'
+      - name: Bundle backend (macOS)
+        if: runner.os == 'macOS'
         run: python desktop/build-scripts/bundle_backend.py
 
-      - name: Bundle backend (Windows — no C++ core)
+      - name: Bundle backend (Linux — onedir to avoid 4GB limit)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          mkdir -p desktop/src-tauri/bin
+          SO_FILE=$(find backend/cpp/build -name 'semiovis_core*.so' | head -1)
+          ADD_BIN=""
+          if [ -n "$SO_FILE" ]; then
+            ADD_BIN="--add-binary $SO_FILE:."
+          fi
+          # Collect model files
+          ADD_DATA=""
+          for f in backend/models/*.pt backend/models/*.onnx; do
+            [ -f "$f" ] && ADD_DATA="$ADD_DATA --add-data $f:models/"
+          done
+          python -m PyInstaller backend/main.py \
+            --name semiovis_api \
+            --onedir \
+            --noconfirm \
+            --hidden-import semiovis_core \
+            --hidden-import uvicorn \
+            --hidden-import uvicorn.logging \
+            --hidden-import uvicorn.loops \
+            --hidden-import uvicorn.loops.auto \
+            --hidden-import uvicorn.protocols \
+            --hidden-import uvicorn.protocols.http \
+            --hidden-import uvicorn.protocols.http.auto \
+            --hidden-import uvicorn.protocols.websockets \
+            --hidden-import uvicorn.protocols.websockets.auto \
+            --hidden-import uvicorn.lifespan \
+            --hidden-import uvicorn.lifespan.on \
+            $ADD_BIN $ADD_DATA \
+            --distpath desktop/src-tauri/bin \
+            --workpath desktop/build-scripts/build \
+            --specpath desktop/build-scripts
+          # For --onedir, PyInstaller creates bin/semiovis_api/ directory
+          # Create a wrapper script so sidecar.rs can find it at bin/semiovis_api (as file)
+          if [ -d "desktop/src-tauri/bin/semiovis_api" ]; then
+            mv desktop/src-tauri/bin/semiovis_api desktop/src-tauri/bin/semiovis_api_dir
+            cat > desktop/src-tauri/bin/semiovis_api <<'WRAPPER'
+#!/bin/bash
+DIR="$(cd "$(dirname "$0")/semiovis_api_dir" && pwd)"
+exec "$DIR/semiovis_api" "$@"
+WRAPPER
+            chmod +x desktop/src-tauri/bin/semiovis_api
+          fi
+
+      - name: Bundle backend (Windows)
         if: runner.os == 'Windows'
         shell: bash
         run: |
           mkdir -p desktop/src-tauri/bin
+          # Collect model files
+          ADD_DATA=""
+          for f in backend/models/*.pt backend/models/*.onnx; do
+            [ -f "$f" ] && ADD_DATA="$ADD_DATA --add-data $f:models/"
+          done
           python -m PyInstaller backend/main.py \
             --name semiovis_api \
-            --onefile \
+            --onedir \
             --noconfirm \
             --hidden-import uvicorn \
             --hidden-import uvicorn.logging \
@@ -137,18 +192,23 @@ jobs:
             --hidden-import uvicorn.protocols.websockets.auto \
             --hidden-import uvicorn.lifespan \
             --hidden-import uvicorn.lifespan.on \
+            $ADD_DATA \
             --distpath desktop/src-tauri/bin
 
       - name: Verify backend binary exists
         shell: bash
         run: |
+          echo "Contents of bin/:"
+          ls -la desktop/src-tauri/bin/
           if [ -f "desktop/src-tauri/bin/semiovis_api" ]; then
-            echo "Backend binary found ($(du -h desktop/src-tauri/bin/semiovis_api | cut -f1))"
-          elif [ -f "desktop/src-tauri/bin/semiovis_api.exe" ]; then
-            echo "Backend binary found ($(du -h desktop/src-tauri/bin/semiovis_api.exe | cut -f1))"
+            echo "Backend binary found ($(du -sh desktop/src-tauri/bin/semiovis_api | cut -f1))"
+          elif [ -d "desktop/src-tauri/bin/semiovis_api" ] || [ -d "desktop/src-tauri/bin/semiovis_api_dir" ]; then
+            echo "Backend directory bundle found ($(du -sh desktop/src-tauri/bin/semiovis_api_dir 2>/dev/null || du -sh desktop/src-tauri/bin/semiovis_api | cut -f1))"
+          elif [ -f "desktop/src-tauri/bin/semiovis_api.exe" ] || [ -d "desktop/src-tauri/bin/semiovis_api" ]; then
+            echo "Backend found (Windows)"
           else
             echo "ERROR: Backend binary not found!"
-            ls -la desktop/src-tauri/bin/
+            find desktop/src-tauri/bin/ -maxdepth 2 -type f | head -20
             exit 1
           fi
 
@@ -182,9 +242,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: SemioVis-${{ matrix.label }}
-          path: |
-            desktop/src-tauri/target/release/bundle/dmg/*.dmg
-            desktop/src-tauri/target/release/bundle/macos/*.app
+          path: desktop/src-tauri/target/release/bundle/dmg/*.dmg
 
       - name: Upload Linux bundle
         if: runner.os == 'Linux'
@@ -216,7 +274,7 @@ jobs:
         uses: actions/download-artifact@v4
 
       - name: List downloaded artifacts
-        run: find . -type f -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.msi" -o -name "*.exe" | head -20
+        run: find . -type f \( -name "*.dmg" -o -name "*.deb" -o -name "*.AppImage" -o -name "*.msi" -o -name "*.exe" \) | head -20
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

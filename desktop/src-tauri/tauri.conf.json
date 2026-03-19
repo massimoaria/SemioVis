@@ -31,7 +31,7 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "bin/semiovis_api",
+      "bin/*",
       "scripts/Install SemioVis.command"
     ]
   },
