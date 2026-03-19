@@ -1,9 +1,19 @@
 """Download all required local models on first run."""
 
+import sys
 import urllib.request
 from pathlib import Path
 
-MODEL_DIR = Path(__file__).parent
+
+def _get_model_dir() -> Path:
+    """Return model directory, handling PyInstaller frozen bundles."""
+    if getattr(sys, 'frozen', False):
+        # Running inside PyInstaller bundle
+        return Path(sys._MEIPASS) / "models"
+    return Path(__file__).parent
+
+
+MODEL_DIR = _get_model_dir()
 MODELS = {
     "yolov8n.pt": "https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov8n.pt",
     "yolov8n-pose.pt": "https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov8n-pose.pt",
@@ -13,7 +23,10 @@ MODELS = {
 
 
 def ensure_models():
-    """Download any missing model files."""
+    """Download any missing model files. Skip in frozen (PyInstaller) mode."""
+    if getattr(sys, 'frozen', False):
+        # Models are bundled inside the PyInstaller binary — no download needed
+        return
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     for filename, url in MODELS.items():
         path = MODEL_DIR / filename

@@ -11,7 +11,14 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-MODEL_DIR = Path(__file__).parent.parent / "models"
+def _get_model_dir() -> Path:
+    """Return model directory, handling PyInstaller frozen bundles."""
+    import sys
+    if getattr(sys, 'frozen', False):
+        return Path(sys._MEIPASS) / "models"
+    return Path(__file__).parent.parent / "models"
+
+MODEL_DIR = _get_model_dir()
 
 
 class LocalModels:

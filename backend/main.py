@@ -21,29 +21,38 @@ if os.environ.get("USE_CPP_CORE", "").lower() in ("1", "true", "yes"):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Load C++ core and ML models on startup."""
+    import threading
+
     # Load C++ shared library or Python fallback
     try:
         import semiovis_core
         app.state.cpp_core = semiovis_core
-        print("C++ core loaded: semiovis_core")
+        print("C++ core loaded: semiovis_core", flush=True)
     except (ImportError, OSError) as e:
-        print(f"C++ core not available ({e}) — using Python fallback")
+        print(f"C++ core not available ({e}) — using Python fallback", flush=True)
         from core import python_fallback
         app.state.cpp_core = python_fallback
 
-    # Download missing model files and load local ML models
-    from models.download_models import ensure_models
-    from core.local_models import LocalModels
+    # Mark models as not yet loaded; load in background thread
+    app.state.local_models = None
+    app.state.models_loading = True
 
-    try:
-        ensure_models()
-        local_models = LocalModels()
-        local_models.load()
-        app.state.local_models = local_models
-        print("Local ML models loaded")
-    except Exception as e:
-        print(f"WARNING: Could not load local ML models ({e})")
-        app.state.local_models = None
+    def _load_models():
+        from models.download_models import ensure_models
+        from core.local_models import LocalModels
+        try:
+            ensure_models()
+            local_models = LocalModels()
+            local_models.load()
+            app.state.local_models = local_models
+            print("Local ML models loaded", flush=True)
+        except Exception as e:
+            print(f"WARNING: Could not load local ML models ({e})", flush=True)
+        finally:
+            app.state.models_loading = False
+
+    threading.Thread(target=_load_models, daemon=True).start()
+    print("Server starting (models loading in background)...", flush=True)
 
     yield
 
@@ -85,3 +94,10 @@ async def update_api_keys(payload: _ApiKeysPayload):
     from core.vision_api import set_api_keys
     set_api_keys(payload.model_dump())
     return {"status": "ok"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("API_PORT", "8000"))
+    host = os.environ.get("API_HOST", "0.0.0.0")
+    uvicorn.run(app, host=host, port=port, log_level="info")

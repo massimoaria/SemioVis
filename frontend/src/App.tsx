@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { AlertTriangle, X } from 'lucide-react'
+import { AlertTriangle, X, Loader2 } from 'lucide-react'
 import { Layout } from './components/layout/Layout'
 import { HomePage } from './components/layout/HomePage'
 import { MethodologyGuide } from './components/layout/MethodologyGuide'
@@ -11,6 +11,7 @@ import { CompositionalPanel } from './components/compositional/CompositionalPane
 import { DashboardPanel } from './components/dashboard/DashboardPanel'
 import { ReportPanel } from './components/report/ReportPanel'
 import { useAnalysisStore } from './store/analysisStore'
+import { isTauri, checkBackend } from './api/client'
 
 function ApiKeyBanner() {
   const settings = useAnalysisStore((s) => s.settings)
@@ -48,10 +49,54 @@ function ApiKeyBanner() {
   )
 }
 
+function BackendLoadingScreen({ elapsed }: { elapsed: number }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-screen bg-gradient-to-br from-gray-50 to-blue-50">
+      <Loader2 className="w-10 h-10 text-primary-600 animate-spin mb-4" />
+      <h2 className="text-xl font-semibold text-gray-800 mb-2">Starting SemioVis</h2>
+      <p className="text-sm text-gray-500 text-center max-w-sm">
+        {elapsed < 30
+          ? 'Loading the analysis engine...'
+          : elapsed < 60
+            ? 'Still loading. This may take up to a minute on first launch...'
+            : 'Almost ready. The first launch takes longer while the engine initializes...'}
+      </p>
+    </div>
+  )
+}
+
 function App() {
   const activeTab = useAnalysisStore((s) => s.activeTab)
   const imageId = useAnalysisStore((s) => s.imageId)
   const [showMethodology, setShowMethodology] = useState(false)
+  const [backendReady, setBackendReady] = useState(!isTauri)
+  const [elapsed, setElapsed] = useState(0)
+
+  // In desktop mode, wait for backend to start
+  useEffect(() => {
+    if (!isTauri) return
+    let cancelled = false
+    const startTime = Date.now()
+
+    // Update elapsed timer every second
+    const timer = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startTime) / 1000))
+    }, 1000)
+
+    // Poll until backend is ready (no hard timeout — keep trying)
+    const poll = async () => {
+      while (!cancelled) {
+        if (await checkBackend()) {
+          setBackendReady(true)
+          break
+        }
+        await new Promise((r) => setTimeout(r, 2000))
+      }
+    }
+    poll()
+
+    return () => { cancelled = true; clearInterval(timer) }
+  }, [])
 
   // Listen for help modal opening methodology
   useEffect(() => {
@@ -59,6 +104,10 @@ function App() {
     window.addEventListener('open-methodology', handler)
     return () => window.removeEventListener('open-methodology', handler)
   }, [])
+
+  if (!backendReady) {
+    return <BackendLoadingScreen elapsed={elapsed} />
+  }
 
   if (showMethodology) {
     return (

@@ -14,21 +14,26 @@ const queryClient = new QueryClient({
   },
 })
 
-// Restore saved settings and send API keys to backend on startup
-try {
-  const saved = localStorage.getItem('semiovis_settings')
-  if (saved) {
+// Restore saved settings and send API keys to backend once it's ready
+import { isTauri, waitForBackend } from './api/client'
+
+async function sendSavedKeys() {
+  try {
+    const saved = localStorage.getItem('semiovis_settings')
+    if (!saved) return
     const settings = JSON.parse(saved)
     const keys = settings.apiKeys
     if (keys && (keys.gemini || keys.openai || keys.mistral)) {
-      apiClient.post('/settings/keys', {
+      if (isTauri) await waitForBackend(90000)
+      await apiClient.post('/settings/keys', {
         gemini: keys.gemini || '',
         openai: keys.openai || '',
         mistral: keys.mistral || '',
-      }).catch(() => {})
+      })
     }
-  }
-} catch {}
+  } catch {}
+}
+sendSavedKeys()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
