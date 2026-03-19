@@ -47,6 +47,23 @@ const defaultSettings: AppSettings = {
   },
 }
 
+function loadPersistedSettings(): AppSettings {
+  try {
+    const raw = localStorage.getItem('semiovis_settings')
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      return {
+        ...defaultSettings,
+        ...parsed,
+        apiKeys: { ...defaultSettings.apiKeys, ...parsed.apiKeys },
+      }
+    }
+  } catch {
+    // ignore corrupted data
+  }
+  return defaultSettings
+}
+
 export const useAnalysisStore = create<AnalysisStore>((set) => ({
   imageId: null,
   imageMeta: null,
@@ -55,7 +72,7 @@ export const useAnalysisStore = create<AnalysisStore>((set) => ({
   compositional: null,
   isLoading: {},
   activeTab: 'upload',
-  settings: defaultSettings,
+  settings: loadPersistedSettings(),
 
   setImage: (id, meta) =>
     set({
@@ -77,9 +94,17 @@ export const useAnalysisStore = create<AnalysisStore>((set) => ({
   setActiveTab: (tab) => set({ activeTab: tab }),
 
   updateSettings: (s) =>
-    set((state) => ({
-      settings: { ...state.settings, ...s },
-    })),
+    set((state) => {
+      const updated = {
+        ...state.settings,
+        ...s,
+        apiKeys: s.apiKeys
+          ? { ...state.settings.apiKeys, ...s.apiKeys }
+          : state.settings.apiKeys,
+      }
+      localStorage.setItem('semiovis_settings', JSON.stringify(updated))
+      return { settings: updated }
+    }),
 
   resetAll: () =>
     set({
