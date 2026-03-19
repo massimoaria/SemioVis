@@ -117,6 +117,19 @@ Download the latest release for your platform from the [Releases](../../releases
 | Linux | `.AppImage`, `.deb` |
 | Windows | `.msi`, `.exe` |
 
+**macOS: first launch setup**
+
+Since SemioVis is not signed with an Apple Developer certificate, macOS will block it by default. After copying SemioVis.app to your Applications folder:
+
+**Option A** -- Double-click the `Install SemioVis.command` script included in the DMG. It removes the quarantine flag automatically.
+
+**Option B** -- Run this command in Terminal:
+```bash
+xattr -cr /Applications/SemioVis.app
+```
+
+**Option C** -- Right-click SemioVis.app, select "Open", then click "Open" again in the dialog. macOS will remember your choice for future launches.
+
 ### Development setup
 
 **Prerequisites:** Python 3.11+, Node.js 20+, Rust (for Tauri), CMake, OpenCV, Eigen3

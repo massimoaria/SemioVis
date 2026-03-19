@@ -38,10 +38,39 @@ echo "--- Step 4: Build Tauri desktop app ---"
 cd "$ROOT/desktop/src-tauri"
 
 if [ "$1" = "--release" ] || [ "$1" = "--bundle-backend" ]; then
-    cargo build --release
+    cargo tauri build
+    echo ""
+
+    # 5. Rebuild DMG with install script visible in the DMG window
+    echo "--- Step 5: Rebuild DMG with install script ---"
+    DMG_DIR="$ROOT/desktop/src-tauri/target/release/bundle/dmg"
+    APP_DIR="$ROOT/desktop/src-tauri/target/release/bundle/macos"
+    SCRIPT_SRC="$ROOT/desktop/src-tauri/scripts/Install SemioVis.command"
+
+    if [ -d "$APP_DIR/SemioVis.app" ] && [ -f "$SCRIPT_SRC" ]; then
+        # Create a staging directory with app + script
+        STAGING=$(mktemp -d)
+        cp -R "$APP_DIR/SemioVis.app" "$STAGING/"
+        cp "$SCRIPT_SRC" "$STAGING/Install SemioVis.command"
+        ln -s /Applications "$STAGING/Applications"
+
+        # Remove old DMG
+        rm -f "$DMG_DIR"/SemioVis_*.dmg
+
+        # Create new DMG
+        ARCH=$(uname -m)
+        DMG_NAME="SemioVis_1.0.0_${ARCH}.dmg"
+        hdiutil create -volname "SemioVis" -srcfolder "$STAGING" \
+            -ov -format UDZO "$DMG_DIR/$DMG_NAME"
+
+        rm -rf "$STAGING"
+        echo "DMG created: $DMG_DIR/$DMG_NAME"
+    fi
+
     echo ""
     echo "=== Release build complete ==="
-    echo "Binary: $ROOT/desktop/src-tauri/target/release/semiovis-desktop"
+    echo "App:  $APP_DIR/SemioVis.app"
+    echo "DMG:  $DMG_DIR/$DMG_NAME"
 else
     cargo build
     echo ""

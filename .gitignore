@@ -18,6 +18,9 @@ frontend/.vite/
 
 # Tauri
 desktop/src-tauri/target/
+desktop/src-tauri/bin/
+desktop/build-scripts/build/
+desktop/build-scripts/*.spec
 
 # C++ build
 backend/cpp/build/

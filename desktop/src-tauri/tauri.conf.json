@@ -30,7 +30,10 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": []
+    "resources": [
+      "bin/semiovis_api",
+      "scripts/Install SemioVis.command"
+    ]
   },
   "plugins": {}
 }
