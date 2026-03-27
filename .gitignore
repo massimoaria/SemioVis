@@ -19,6 +19,7 @@ frontend/.vite/
 # Tauri
 desktop/src-tauri/target/
 desktop/src-tauri/bin/
+desktop/bin/
 desktop/build-scripts/build/
 desktop/build-scripts/*.spec
 

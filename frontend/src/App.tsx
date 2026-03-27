@@ -83,14 +83,16 @@ function App() {
       setElapsed(Math.floor((Date.now() - startTime) / 1000))
     }, 1000)
 
-    // Poll until backend is ready (no hard timeout — keep trying)
+    // Poll until backend is ready — adaptive interval (500ms first 15s, then 1s)
     const poll = async () => {
       while (!cancelled) {
         if (await checkBackend()) {
           setBackendReady(true)
           break
         }
-        await new Promise((r) => setTimeout(r, 2000))
+        const elapsed = Date.now() - startTime
+        const interval = elapsed < 15000 ? 500 : 1000
+        await new Promise((r) => setTimeout(r, interval))
       }
     }
     poll()

@@ -16,7 +16,7 @@ ROOT = Path(__file__).parent.parent.parent
 BACKEND = ROOT / "backend"
 CPP_BUILD = BACKEND / "cpp" / "build"
 MODELS_DIR = BACKEND / "models"
-OUTPUT_DIR = ROOT / "desktop" / "src-tauri" / "bin"
+OUTPUT_DIR = ROOT / "desktop" / "bin"
 
 
 def find_so_files():
@@ -58,7 +58,7 @@ def main():
         sys.executable, "-m", "PyInstaller",
         str(BACKEND / "main.py"),
         "--name", "semiovis_api",
-        "--onefile",
+        "--onedir",
         "--noconfirm",
         "--hidden-import", "semiovis_core",
         "--hidden-import", "uvicorn",
@@ -87,13 +87,17 @@ def main():
         print("PyInstaller failed!")
         sys.exit(1)
 
-    output_binary = OUTPUT_DIR / "semiovis_api"
+    # onedir produces a directory: OUTPUT_DIR/semiovis_api/semiovis_api(.exe)
+    output_dir = OUTPUT_DIR / "semiovis_api"
+    output_binary = output_dir / "semiovis_api"
     if not output_binary.exists():
-        output_binary = OUTPUT_DIR / "semiovis_api.exe"
+        output_binary = output_dir / "semiovis_api.exe"
 
     if output_binary.exists():
-        size_mb = output_binary.stat().st_size / (1024 * 1024)
-        print(f"\nSuccess! Binary: {output_binary} ({size_mb:.1f} MB)")
+        # Calculate total directory size
+        total = sum(f.stat().st_size for f in output_dir.rglob("*") if f.is_file())
+        size_mb = total / (1024 * 1024)
+        print(f"\nSuccess! Directory: {output_dir} ({size_mb:.0f} MB)")
     else:
         print("WARNING: Binary not found at expected location")
 

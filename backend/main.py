@@ -20,24 +20,29 @@ if os.environ.get("USE_CPP_CORE", "").lower() in ("1", "true", "yes"):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Load C++ core and ML models on startup."""
+    """Start serving immediately; load C++ core and ML models in background."""
     import threading
 
-    # Load C++ shared library or Python fallback
-    try:
-        import semiovis_core
-        app.state.cpp_core = semiovis_core
-        print("C++ core loaded: semiovis_core", flush=True)
-    except (ImportError, OSError) as e:
-        print(f"C++ core not available ({e}) — using Python fallback", flush=True)
-        from core import python_fallback
-        app.state.cpp_core = python_fallback
-
-    # Mark models as not yet loaded; load in background thread
+    # Initialise state — everything loads in background so uvicorn binds ASAP
+    app.state.cpp_core = None
     app.state.local_models = None
     app.state.models_loading = True
+    app.state.core_loading = True
 
-    def _load_models():
+    def _load_all():
+        # 1. Load C++ shared library or Python fallback
+        try:
+            import semiovis_core
+            app.state.cpp_core = semiovis_core
+            print("C++ core loaded: semiovis_core", flush=True)
+        except (ImportError, OSError) as e:
+            print(f"C++ core not available ({e}) — using Python fallback", flush=True)
+            from core import python_fallback
+            app.state.cpp_core = python_fallback
+        finally:
+            app.state.core_loading = False
+
+        # 2. Load ML models
         from models.download_models import ensure_models
         from core.local_models import LocalModels
         try:
@@ -51,8 +56,8 @@ async def lifespan(app: FastAPI):
         finally:
             app.state.models_loading = False
 
-    threading.Thread(target=_load_models, daemon=True).start()
-    print("Server starting (models loading in background)...", flush=True)
+    threading.Thread(target=_load_all, daemon=True).start()
+    print("Server starting (core + models loading in background)...", flush=True)
 
     yield
 
@@ -71,6 +76,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/health")
+async def health():
+    """Lightweight readiness probe — no OpenAPI overhead."""
+    return {
+        "status": "ok",
+        "core_ready": not getattr(app.state, "core_loading", True),
+        "models_ready": not getattr(app.state, "models_loading", True),
+    }
 
 app.include_router(upload.router, prefix="/api")
 app.include_router(representational.router, prefix="/api/analyse")

@@ -101,13 +101,13 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      # ── Bundle backend with PyInstaller ─────────────────────────
+      # ── Bundle backend with PyInstaller (onedir for fast startup) ──
 
-      - name: Bundle backend (macOS — onefile)
+      - name: Bundle backend (macOS)
         if: runner.os == 'macOS'
         run: python desktop/build-scripts/bundle_backend.py
 
-      - name: Bundle backend (Windows — onedir)
+      - name: Bundle backend (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
@@ -135,38 +135,35 @@ jobs:
             --hidden-import uvicorn.lifespan `
             --hidden-import uvicorn.lifespan.on `
             @addData `
-            --distpath "$repoRoot/desktop/src-tauri" `
+            --distpath "$repoRoot/desktop/bin" `
             --workpath "$repoRoot/desktop/build-scripts/build" `
             --specpath "$repoRoot/desktop/build-scripts"
-          # Move onedir output to bin/
-          $src = "$repoRoot/desktop/src-tauri/semiovis_api"
-          $dst = "$repoRoot/desktop/src-tauri/bin"
-          Write-Host "Checking if $src exists..."
-          if (Test-Path $src) {
-            if (Test-Path $dst) { Remove-Item -Recurse -Force $dst }
-            Move-Item -Path $src -Destination $dst -Force
-            $size = (Get-ChildItem -Recurse $dst | Measure-Object -Property Length -Sum).Sum / 1MB
-            Write-Host "Windows backend dir size: $([math]::Round($size, 1)) MB"
-            Write-Host "Files in bin/:"
-            Get-ChildItem $dst | Select-Object Name, Length | Format-Table
-          } else {
-            Write-Host "ERROR: PyInstaller output directory not found at $src"
-            Write-Host "Contents of desktop/src-tauri/:"
-            Get-ChildItem "$repoRoot/desktop/src-tauri/" | Select-Object Name
-            exit 1
-          }
 
       - name: Verify backend binary
         shell: bash
         run: |
-          echo "Contents of bin/:"
-          ls desktop/src-tauri/bin/ | head -20
-          if [ -f "desktop/src-tauri/bin/semiovis_api" ] || [ -f "desktop/src-tauri/bin/semiovis_api.exe" ]; then
-            echo "Backend binary found"
+          echo "Contents of desktop/bin/semiovis_api/:"
+          ls desktop/bin/semiovis_api/ | head -20
+          if [ -f "desktop/bin/semiovis_api/semiovis_api" ] || [ -f "desktop/bin/semiovis_api/semiovis_api.exe" ]; then
+            echo "Backend binary found (onedir)"
           else
-            echo "ERROR: No semiovis_api binary in bin/"
+            echo "ERROR: No semiovis_api binary in desktop/bin/semiovis_api/"
             exit 1
           fi
+
+      # ── Resolve symlinks (macOS — Tauri can't bundle symlinks) ──
+
+      - name: Resolve symlinks in backend bundle
+        if: runner.os == 'macOS'
+        run: |
+          cd desktop/bin/semiovis_api
+          find . -type l | while read link; do
+            target=$(readlink -f "$link")
+            rm "$link"
+            cp "$target" "$link" 2>/dev/null || true
+          done
+          remaining=$(find . -type l | wc -l)
+          echo "Remaining symlinks: $remaining"
 
       # ── Create install script placeholder ───────────────────────
 
